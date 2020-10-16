@@ -16,11 +16,11 @@
   "runtimeVersion": "V8",
   "addOns": {
     "common": {
-      "name": "Cats",
-      "logoUrl": "https://www.gstatic.com/images/icons/material/system/1x/pets_black_48dp.png",
+      "name": "Do The Thing!",
+      "logoUrl": "https://timdenouden.github.io/DoTheThing/images/baseline_check_circle_outline_black_48dp.png",
       "layoutProperties": {
-        "primaryColor": "#00838F",
-        "secondaryColor": "#D32F2F"
+        "primaryColor": "#212121",
+        "secondaryColor": "#2e7d32"
       },
       "useLocaleFromApp": true,
       "homepageTrigger": {

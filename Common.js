@@ -45,7 +45,7 @@ function createNavigationCard() {
 
   var card = CardService.newCardBuilder()
     .setHeader(
-      CardService.newCardHeader().setTitle('Task Lists')
+      CardService.newCardHeader().setTitle('Google Task Lists')
     ).addSection(
       CardService.newCardSection().addWidget(buttonSet)
     );
@@ -79,7 +79,7 @@ function buildTasksCard(taskListId, taskListName) {
     .setPrimaryButton(CardService.newTextButton()
       .setText('Powered by cataas.com')
       .setTextButtonStyle(CardService.TextButtonStyle.FILLED)
-      .setBackgroundColor("#D32F2F")
+      .setBackgroundColor("#2e7d32")
       .setOnClickAction(footerButtonAction));
 
   var card = CardService.newCardBuilder()
