@@ -1,130 +1,314 @@
 
-/**
- * Callback for rendering the homepage card.
- * @return {CardService.Card} The card to show to the user.
- */
-function onHomepage(e) {
-  return createNavigationCard(null)
-}
 
-function handleDropdownSelection(e) {
-  var selectedTaskListId = e.commonEventObject.formInputs.taskListsField.stringInputs.value;
-  return buildTaskCard(selectedTaskListId);
-}
 
-function generateCalendarEvent(e) {
-  console.log(e);
-}
+/** ======================================================== Event Functions ======================================================== */
 
-function goToTasksCard(e) {
-  var tasksCard = buildTasksCard(e.parameters.id, e.parameters.name);
 
+
+function resetUserProps(e) {
   var userProps = PropertiesService.getUserProperties();
-  userProps.setProperties({
-    'id': e.parameters.id,
-    'name': e.parameters.name
-  });
+  userProps.deleteAllProperties();
 
-  var nav = CardService.newNavigation().pushCard(tasksCard);
+  var selectTaskListCard = buildTaskListSelectCard();
+  var nav = CardService.newNavigation().updateCard(selectTaskListCard);
   return CardService.newActionResponseBuilder()
     .setNavigation(nav)
     .build();
 }
 
-function createNavigationCard() {
+/**
+ * Callback for rendering the homepage card.
+ * @return {CardService.Card} The card to show to the user.
+ */
+function onHomepage(e) {
+  return buildTasksCard();
+}
+
+function generateCalendarEvent(e) {
+  var taskListId = e.commonEventObject.parameters.taskListId;
+  var calendarId = e.commonEventObject.parameters.calendarId;
+
+  var tasks = getTasks(taskListId);
+  var description = "What I did today:";
+  tasks.forEach(task => {
+    description = description + "\n - " + task.title
+  });
+
+  createCalendarEvent(calendarId, "Done!", description);
+  clearTasks(taskListId);
+}
+
+function navToSelectTaskList(e) {
+  var selectTaskListCard = buildTaskListSelectCard();
+  var nav = CardService.newNavigation().updateCard(selectTaskListCard);
+  return CardService.newActionResponseBuilder()
+    .setNavigation(nav)
+    .build();
+}
+
+function navToSelectCalendarList(e) {
+  var selectCalendarCard = buildCalendarSelectCard();
+  var nav = CardService.newNavigation().updateCard(selectCalendarCard);
+  return CardService.newActionResponseBuilder()
+    .setNavigation(nav)
+    .build();
+}
+
+function selectTaskList(e) {
   var userProps = PropertiesService.getUserProperties();
-  console.log(userProps.getProperties());
+  userProps.setProperty("taskListId", e.commonEventObject.parameters.taskListId);
+  userProps.setProperty("taskListName", e.commonEventObject.parameters.taskListName);
+  
+  var tasksCard = buildTasksCard();
+  var nav = CardService.newNavigation().updateCard(tasksCard);
+  return CardService.newActionResponseBuilder()
+    .setNavigation(nav)
+    .build();
+}
+
+function selectCalendar(e) {
+  var userProps = PropertiesService.getUserProperties();
+  userProps.setProperty("calendarId", e.commonEventObject.parameters.calendarId);
+  userProps.setProperty("calendarName", e.commonEventObject.parameters.calendarName);
+  
+  var tasksCard = buildTasksCard();
+  var nav = CardService.newNavigation().updateCard(tasksCard);
+  return CardService.newActionResponseBuilder()
+    .setNavigation(nav)
+    .build();
+}
+
+function refresh(e) {
+  var tasksCard = buildTasksCard();
+  var nav = CardService.newNavigation().updateCard(tasksCard);
+  return CardService.newActionResponseBuilder()
+    .setNavigation(nav)
+    .build();
+}
+
+
+
+/** ======================================================== UI Functions ======================================================== */
+
+
+
+function buildTasksCard() {
+  var userProps = PropertiesService.getUserProperties();
+  var taskList = {
+    'id': userProps.getProperty("taskListId"),
+    'name': userProps.getProperty("taskListName")
+  }
+
+  var calendar = {
+    'id': userProps.getProperty("calendarId"),
+    'name': userProps.getProperty("calendarName")
+  }
+
+  var cardBuilder = CardService.newCardBuilder();
+
+  if(taskList && taskList.id && taskList.name) {
+    // build the tasks from taskList
+    var calendarSection = buildCalendarSection(calendar);
+
+    var tasksSection = buildTasksSection(taskList);
+
+    var footerButtonAction = CardService.newAction()
+      .setFunctionName('generateCalendarEvent')
+      .setParameters({
+        'taskListId': taskList.id,
+        'calendarId': calendar.id ? calendar.id : "primary"
+      });
+
+    var footer = CardService.newFixedFooter()
+      .setPrimaryButton(CardService.newTextButton()
+        .setText('Add Tasks To Calendar')
+        .setTextButtonStyle(CardService.TextButtonStyle.FILLED)
+        .setBackgroundColor("#0066cc")
+        .setOnClickAction(footerButtonAction));
+
+    cardBuilder.addSection(calendarSection)
+      .addSection(tasksSection)
+      .setFixedFooter(footer);
+  }
+  else {
+    // build empty state card
+    var navToSelectTaskListButtonAction = CardService.newAction()
+      .setFunctionName("navToSelectTaskList");
+
+    var navToSelectTaskListButton = CardService.newTextButton()
+      .setText("Select Default Task List")
+      .setTextButtonStyle(CardService.TextButtonStyle.FILLED)
+      .setOnClickAction(navToSelectTaskListButtonAction);
+
+    var emptySection = CardService.newCardSection()
+      .addWidget(navToSelectTaskListButton);
+      
+    cardBuilder.addSection(emptySection)
+  }
+  return cardBuilder.build();
+}
+
+function buildCalendarSection(calendar) {
+  var calendarSection = CardService.newCardSection()
+    .setHeader("Calendar");
+
+  var selectCalendarButtonAction = CardService.newAction()
+    .setFunctionName("navToSelectCalendarList");
+
+  var selectCalendarButton = CardService.newTextButton()
+    .setText("Select")
+    .setTextButtonStyle(CardService.TextButtonStyle.TEXT)
+    .setOnClickAction(selectCalendarButtonAction);
+
+  var contentText = "primary";
+
+  if(calendar && calendar.id && calendar.name) {
+    //build the display
+    contentText = calendar.name;
+  }
+
+  var selectCalendarKeyValue = CardService.newKeyValue()
+    .setContent(contentText)
+    .setButton(selectCalendarButton)
+
+  return calendarSection.addWidget(selectCalendarKeyValue);
+}
+
+function buildTasksSection(taskList) {
+  var tasksSection = CardService.newCardSection()
+    .setHeader("Completed Tasks");
+
+  if(taskList && taskList.id && taskList.name) {
+    // build the list
+    var refreshButtonAction = CardService.newAction()
+      .setFunctionName("refresh");
+
+    var refreshButton = CardService.newTextButton()
+      .setText("Refresh")
+      .setTextButtonStyle(CardService.TextButtonStyle.TEXT)
+      .setOnClickAction(refreshButtonAction);
+    
+    var refreshKeyValue = CardService.newKeyValue()
+      .setContent(taskList.name)
+      .setButton(refreshButton)
+
+    tasksSection.addWidget(refreshKeyValue);
+
+    var tasks = getTasks(taskList.id);
+
+    if(tasks.length > 0) {
+      tasks.map(function (task) {
+        var taskSummaryWidget = CardService.newKeyValue()
+          .setContent(task.title)
+          .setIcon(CardService.Icon.DESCRIPTION);
+  
+        if (task.notes) {
+          taskSummaryWidget.setBottomLabel(task.notes);
+        }
+        tasksSection.addWidget(taskSummaryWidget);
+      });
+    }
+    else {
+      var noTasksText = CardService.newTextParagraph()
+        .setText("No completed tasks in list.");
+
+      tasksSection.addWidget(noTasksText);
+    }
+  }
+  else {
+    // build an empty state
+    var invalidStateText = CardService.newTextParagraph()
+      .setText("The Task List is invalid.");
+
+    tasksSection.addWidget(invalidStateText);
+  }
+  return tasksSection;
+}
+
+function buildTaskListSelectCard() {
+  var cardBuilder = CardService.newCardBuilder();
+
+  var taskListsHeader = CardService.newCardHeader()
+      .setTitle("Task Lists");
+
+  var taskListsSection = CardService.newCardSection();
 
   var taskLists = getTaskLists();
 
-  var buttonSet = CardService.newButtonSet();
+  taskLists.map(function(taskList) {
+    var selectTaskListButtonAction = CardService.newAction()
+      .setFunctionName("selectTaskList")
+      .setParameters({
+        'taskListId': taskList.id,
+        'taskListName': taskList.name
+      });
 
-  taskLists.forEach(function (taskList) {
-    buttonSet.addButton(createToCardButton(taskList));
-  });
+    var selectTaskListButton = CardService.newTextButton()
+      .setText("Make Default")
+      .setTextButtonStyle(CardService.TextButtonStyle.TEXT)
+      .setOnClickAction(selectTaskListButtonAction);
 
-  var card = CardService.newCardBuilder()
-    .setHeader(
-      CardService.newCardHeader().setTitle('Google Task Lists')
-    ).addSection(
-      CardService.newCardSection().addWidget(buttonSet)
-    );
-  return card.build();
-}
-
-function createToCardButton(taskList) {
-  var action = CardService.newAction()
-    .setFunctionName('goToTasksCard')
-    .setParameters({
-      'id': taskList.id,
-      'name': taskList.name
-    });
-  var button = CardService.newTextButton()
-    .setText(taskList.name)
-    .setOnClickAction(action);
-  return button;
-}
-
-function buildTasksCard(taskListId, taskListName) {
-  var tasksSection = buildTasksSection(taskListId);
-
-  var footerButtonAction = CardService.newAction()
-    .setFunctionName('generateCalendarEvent')
-    .setParameters({
-      'id': taskListId,
-      'name': taskListName
-    });
-
-  var footer = CardService.newFixedFooter()
-    .setPrimaryButton(CardService.newTextButton()
-      .setText('Powered by cataas.com')
-      .setTextButtonStyle(CardService.TextButtonStyle.FILLED)
-      .setBackgroundColor("#2e7d32")
-      .setOnClickAction(footerButtonAction));
-
-  var card = CardService.newCardBuilder()
-    .setHeader(CardService.newCardHeader().setTitle(taskListName).setSubtitle(taskListId))
-    .addSection(tasksSection);
-
-  if (taskListId) {
-    footerButtonAction.setParameters({
-      'id': taskListId,
-      'name': taskListName
-    });
-    card.setFixedFooter(footer);
-  }
-
-  return card.build();
-}
-
-function buildTasksSection(taskListId) {
-  var tasksSection = CardService.newCardSection();
-
-  if (!taskListId) {
-    tasksSection.addWidget(CardService.newTextParagraph()
-      .setText("Please select a task list."));
-
-    return CardService.newCardBuilder()
-      .setHeader(tasksHeader)
-      .addSection(tasksSection)
-      .build();
-  }
-
-  var tasks = getTasks(taskListId);
-
-  tasks.map(function (task) {
     var taskSummaryWidget = CardService.newKeyValue()
-      .setContent(task.title)
-      .setIcon(CardService.Icon.DESCRIPTION);
+      .setContent(taskList.name)
+      .setButton(selectTaskListButton);
 
-    if (task.notes) {
-      taskSummaryWidget.setBottomLabel(task.notes);
-    }
-    tasksSection.addWidget(taskSummaryWidget);
+      taskListsSection.addWidget(taskSummaryWidget);
   });
-
-  return tasksSection;
+    
+  return cardBuilder.setHeader(taskListsHeader)
+    .addSection(taskListsSection)
+    .build();
 }
+
+function buildCalendarSelectCard() {
+  var cardBuilder = CardService.newCardBuilder();
+
+  var calendarsHeader = CardService.newCardHeader()
+      .setTitle("Calendars");
+
+  var calendarsSection = CardService.newCardSection();
+
+  var calendars = getCalendars();
+
+  if(calendars.length > 0) {
+    calendars.map(function(calendar) {
+      var selectCalendarButtonAction = CardService.newAction()
+        .setFunctionName("selectCalendar")
+        .setParameters({
+          'calendarId': calendar.id,
+          'calendarName': calendar.name,
+        });
+  
+      var selectCalendarButton = CardService.newTextButton()
+        .setText("Make Default")
+        .setTextButtonStyle(CardService.TextButtonStyle.TEXT)
+        .setOnClickAction(selectCalendarButtonAction);
+  
+      var calendarWidget = CardService.newKeyValue()
+        .setContent(calendar.name)
+        .setButton(selectCalendarButton);
+  
+        calendarsSection.addWidget(calendarWidget);
+    });  
+  }
+  else {
+    var noCalendarsText = CardService.newTextParagraph()
+      .setText("No calendars in list.");
+
+    calendarsSection.addWidget(noCalendarsText);
+  }
+  
+  return cardBuilder.setHeader(calendarsHeader)
+    .addSection(calendarsSection)
+    .build();
+}
+
+
+
+
+/** ======================================================== Helper Functions ======================================================== */
+
+
 
 /**
  * Returns the ID and name of every task list in the user's account.
@@ -149,10 +333,13 @@ function getTaskLists() {
  * @return {Array.<Object>} The task data.
  */
 function getTasks(taskListId) {
-  var tasks = Tasks.Tasks.list(taskListId).getItems();
+  var tasks = Tasks.Tasks.list(taskListId, { maxResults: 100, showHidden: true, showCompleted: true}).getItems();
   if (!tasks) {
     return [];
   }
+
+  console.log(tasks);
+
   return tasks.map(function (task) {
     return {
       id: task.getId(),
@@ -160,30 +347,62 @@ function getTasks(taskListId) {
       notes: task.getNotes(),
       completed: Boolean(task.getCompleted())
     };
-  }).filter(function (task) {
-    return task.title;
+  }).filter(task => {
+    return (task.title && task.completed === true);
   });
+}
+
+function clearTasks(taskListId) {
+  var tasks = getTasks(taskListId);
+  tasks.forEach(task => {
+    Tasks.Tasks.remove(taskListId, task.id);
+  });
+}
+
+function getCalendars() {
+  var calendars;
+  var pageToken;
+  var results = [];
+  do {
+    calendars = Calendar.CalendarList.list({
+      maxResults: 100,
+      pageToken: pageToken
+    });
+    if (calendars.items && calendars.items.length > 0) {
+      for (var i = 0; i < calendars.items.length; i++) {
+        var calendar = calendars.items[i];
+        results.push({
+          'id': calendar.id,
+          'name': calendar.summary
+        });
+      }
+    } else {
+      console.log('No calendars found.');
+    }
+    pageToken = calendars.nextPageToken;
+  } while (pageToken);
+
+  return results;
 }
 
 /**
  * Creates an event in the user's default calendar.
  */
-function createEvent(summary, description) {
-  var calendarId = 'primary';
-  var start = getRelativeDate(1, 12);
-  var end = getRelativeDate(1, 13);
+function createCalendarEvent(calendarId, summary, description) {
+  var start = getRelativeDate(0, 12);
+  var end = getRelativeDate(0, 13);
   var event = {
     summary: summary,
     description: description,
     start: {
-      dateTime: start.toISOString()
+      date: formatDate(start)
     },
     end: {
-      dateTime: end.toISOString()
+      date: formatDate(end)
     }
   };
   event = Calendar.Events.insert(event, calendarId);
-  Logger.log('Event ID: ' + event.id);
+  Logger.log(event);
 }
 
 /**
@@ -201,4 +420,18 @@ function getRelativeDate(daysOffset, hour) {
   date.setSeconds(0);
   date.setMilliseconds(0);
   return date;
+}
+
+function formatDate(date) {
+  var d = new Date(date),
+      month = '' + (d.getMonth() + 1),
+      day = '' + d.getDate(),
+      year = d.getFullYear();
+
+  if (month.length < 2) 
+      month = '0' + month;
+  if (day.length < 2) 
+      day = '0' + day;
+
+  return [year, month, day].join('-');
 }

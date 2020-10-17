@@ -19,14 +19,20 @@
       "name": "Do The Thing!",
       "logoUrl": "https://timdenouden.github.io/DoTheThing/images/baseline_check_circle_outline_black_48dp.png",
       "layoutProperties": {
-        "primaryColor": "#212121",
-        "secondaryColor": "#2e7d32"
+        "primaryColor": "#ffffff",
+        "secondaryColor": "#0066cc"
       },
       "useLocaleFromApp": true,
       "homepageTrigger": {
         "runFunction": "onHomepage",
         "enabled": true
-      }
+      },
+      "universalActions":[
+        {
+          "label": "Reset Defaults",
+          "runFunction": "resetUserProps"
+        }
+      ]
     },
     "calendar": {
       "eventOpenTrigger": {
